@@ -34,17 +34,35 @@ export function toEventbriteEvent(e: Event, refs: { venueId?: string; logoId?: s
   }
 }
 
+// Eventbrite is not a sales channel: tickets are sold in our own pretix shop (the ticket URL in the
+// description). The event only exists on Eventbrite so Spotify lists it on each artist's page, and
+// Eventbrite needs a ticket class to publish. The class shows the real price but requires an order
+// of at least 99 tickets, which in practice makes it unbuyable. Max per order = min, since Eventbrite
+// rejects a minimum above the maximum, and the total must cover one such order.
+export const BLOCKING_ORDER_SIZE = 99
+
 /** Pure: request body for POST /events/{id}/ticket_classes/. Price in euros → "EUR,1500" (cents). */
 export function toTicketClass(
   e: Event,
   capacity: number,
-): { ticket_class: { name: string; quantity_total: number; cost?: string; free?: boolean } } {
+): {
+  ticket_class: {
+    name: string
+    quantity_total: number
+    minimum_quantity: number
+    maximum_quantity: number
+    cost?: string
+    free?: boolean
+  }
+} {
   const n = Number(e.price?.trim().replace(',', '.').replace(/\s*€$/, ''))
   const paid = e.price?.trim() && Number.isFinite(n) && n > 0
   return {
     ticket_class: {
       name: 'General Admission',
-      quantity_total: capacity,
+      quantity_total: Math.max(capacity, BLOCKING_ORDER_SIZE),
+      minimum_quantity: BLOCKING_ORDER_SIZE,
+      maximum_quantity: BLOCKING_ORDER_SIZE,
       ...(paid ? { cost: `EUR,${Math.round(n * 100)}` } : { free: true }),
     },
   }
@@ -99,9 +117,7 @@ export const eventbrite: Platform = {
       body: toTicketClass(e, Number(process.env.EVENTBRITE_CAPACITY ?? 200)),
     })
 
-    if (process.env.EVENTBRITE_PUBLISH !== '1') {
-      return { url: created.url, note: 'Created as draft (set EVENTBRITE_PUBLISH=1 to publish automatically).' }
-    }
+    // Always publish: Spotify only picks up published events.
     await api(`/events/${created.id}/publish/`, { method: 'POST' })
     return { url: created.url, note: 'Published.' }
   },

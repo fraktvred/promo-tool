@@ -15,19 +15,15 @@ npm test               # payload-mapping unit tests
 | Platform | How | Status |
 |---|---|---|
 | fraktvred.com | Sanity API, creates a **draft** (publish it in the Studio), links existing venue/artists by name | mapping unit-tested |
-| Eventbrite | REST API: venue → logo → event → ticket class; draft unless `EVENTBRITE_PUBLISH=1` | mapping unit-tested |
+| Eventbrite | REST API: venue → logo → event → ticket class → publish (always: Spotify only sees published events). Only there so Spotify lists the event: the ticket shows the real price but needs a 99-ticket minimum order, so nobody buys through it (sales go via pretix) | mapping unit-tested |
 | Neo Group | Email with flyer to events@neo-group.de (`NEO_GROUP_TO` overrides) | mail body unit-tested |
+| visitBerlin | Email with flyer to events@visitberlin.de (`VISITBERLIN_TO` overrides) | mail body unit-tested |
 | KeepItRollin | Playwright, public form | fill verified against live form (dry run) |
-| In-München | Playwright, public form; Cloudflare Turnstile may need `HEADLESS=false` | fill verified against live form (dry run) |
-| Resident Advisor, visitBerlin, Bandsintown, Ströer Kulturkalender | Playwright: login, fill by label, **you submit by hand** (`HEADLESS=false`) | selectors not recorded yet |
-
-To graduate a "manual submit" platform: `npx playwright codegen <submit url>`, then write a module with exact
-selectors and a real `submit` step, modelled on `src/platforms/keepItRollin.ts`.
+| Ströer Kulturkalender Berlin | REST API of Ströer's service portal; needs the 16-char short title + a text-free image | mapping unit-tested |
 
 ## Debugging browser platforms
 
-- `HEADLESS=false`: show the browser
-- `DRY_RUN=1`: fill everything, never click submit
+- `DRY_RUN=1`: fill everything, never click submit (saves a screenshot of the filled form)
 - Failures save a screenshot to `failures/`
 
 ## Container
@@ -42,8 +38,11 @@ docker run -d -p 3000:3000 --env-file .env \
   ghcr.io/<owner>/<repo>:latest
 ```
 
-The container is headless only: the "manual submit" platforms (`HEADLESS=false`) need a display,
-so run those from a local `npm start` instead.
-
 When bumping `playwright` in package.json, bump the `FROM mcr.microsoft.com/playwright:vX.Y.Z` tag
 in the Dockerfile to the same version (the dependency is pinned exactly for this reason).
+
+## Not supported
+
+In-München (Cloudflare Turnstile captcha on every submission) and Resident Advisor (Cloudflare
+blocks headless browsers) would need evading bot protection, so they are left out on purpose.
+Bandsintown was dropped as well.

@@ -20,6 +20,10 @@ export type Event = {
   price?: string
   /** Absolute path of the uploaded flyer on disk. */
   imagePath?: string
+  /** Short title for tight slots (Ströer: max 16 characters). */
+  shortTitle?: string
+  /** Image without any text/logos (Ströer lays title + venue over it). */
+  motifImagePath?: string
 }
 
 export type PublishResult = { url?: string; note?: string }

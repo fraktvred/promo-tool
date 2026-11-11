@@ -13,6 +13,14 @@ const esc = (s: unknown) =>
 type Result = { id: string; name: string; ok: boolean; url?: string; message?: string }
 type FormValues = Partial<Record<keyof Event | 'lineupText', string>> & { selected?: string[] }
 
+async function saveUpload(file: unknown): Promise<string | undefined> {
+  if (!(file instanceof File) || file.size === 0) return undefined
+  await mkdir('uploads', { recursive: true })
+  const path = resolve('uploads', `${randomUUID()}${extname(file.name).toLowerCase() || '.jpg'}`)
+  await writeFile(path, Buffer.from(await file.arrayBuffer()))
+  return path
+}
+
 function page(values: FormValues = {}, results: Result[] = [], errors: string[] = []) {
   const v = (k: keyof FormValues) => esc(values[k] as string)
   const selected = new Set(values.selected ?? platforms.filter((p) => !missingEnv(p).length).map((p) => p.id))
@@ -56,6 +64,8 @@ ${results.length ? `<h2>Results</h2><ul class="results">${resultRows}</ul>` : ''
 <form method="post" action="/publish" enctype="multipart/form-data">
   <fieldset><legend>Event</legend>
     <label for="title">Title</label><input type="text" id="title" name="title" required value="${v('title')}">
+    <label for="shortTitle">Short title <small>(max 16 characters — Ströer)</small></label>
+    <input type="text" id="shortTitle" name="shortTitle" maxlength="16" value="${v('shortTitle')}">
     <div class="row">
       <div><label for="start">Start (Berlin time)</label><input type="datetime-local" id="start" name="start" required value="${v('start')}"></div>
       <div><label for="end">End</label><input type="datetime-local" id="end" name="end" required value="${v('end')}"></div>
@@ -76,6 +86,8 @@ ${results.length ? `<h2>Results</h2><ul class="results">${resultRows}</ul>` : ''
     </div>
     <label for="image">Flyer image${values.imagePath ? ' <small>(re-select to resend it)</small>' : ''}</label>
     <input type="file" id="image" name="image" accept="image/png,image/jpeg">
+    <label for="motif">Text-free image <small>(Ströer: no title, date, venue or logos in the picture)</small></label>
+    <input type="file" id="motif" name="motif" accept="image/png,image/jpeg">
   </fieldset>
   <fieldset><legend>Platforms</legend>${platformRows}</fieldset>
   <button type="submit">Publish</button>
@@ -93,18 +105,13 @@ app.post('/publish', async (c) => {
   const selected = ([] as unknown[]).concat(body.platforms ?? []).filter((x): x is string => typeof x === 'string')
 
   const values: FormValues = {
-    title: str('title'), start: str('start'), end: str('end'), venue: str('venue'), address: str('address'),
+    title: str('title'), shortTitle: str('shortTitle'), start: str('start'), end: str('end'), venue: str('venue'), address: str('address'),
     postalCode: str('postalCode'), city: str('city'), description: str('description'), lineupText: str('lineup'),
     ticketUrl: str('ticketUrl'), price: str('price'), selected,
   }
 
-  let imagePath: string | undefined
-  const image = body.image
-  if (image instanceof File && image.size > 0) {
-    await mkdir('uploads', { recursive: true })
-    imagePath = resolve('uploads', `${randomUUID()}${extname(image.name).toLowerCase() || '.jpg'}`)
-    await writeFile(imagePath, Buffer.from(await image.arrayBuffer()))
-  }
+  const imagePath = await saveUpload(body.image)
+  const motifImagePath = await saveUpload(body.motif)
 
   const errors: string[] = []
   if (!selected.length) errors.push('Pick at least one platform.')
@@ -116,6 +123,7 @@ app.post('/publish', async (c) => {
     postalCode: values.postalCode || undefined, city: values.city!, description: values.description!,
     lineup: values.lineupText!.split('\n').map((l) => l.trim()).filter(Boolean),
     ticketUrl: values.ticketUrl || undefined, price: values.price || undefined, imagePath,
+    shortTitle: values.shortTitle || undefined, motifImagePath,
   }
 
   const chosen = platforms.filter((p) => selected.includes(p.id) && !missingEnv(p).length)
@@ -134,7 +142,7 @@ app.post('/publish', async (c) => {
 
 const port = Number(process.env.PORT ?? 3000)
 const server = serve({ fetch: app.fetch, port, hostname: process.env.HOST ?? '127.0.0.1' }) as Server
-// Manual-submit browser flows can keep a request open for a long time.
+// Several platforms run in one request (browser automation, uploads); don't cut it off.
 server.requestTimeout = 0
 console.log(`Fraktvred promo tool on http://localhost:${port}`)
 for (const p of platforms) {

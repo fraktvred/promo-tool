@@ -2,8 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { slugify, toSanityEvent } from '../src/platforms/fraktvred.ts'
 import { toEventbriteEvent, toTicketClass } from '../src/platforms/eventbrite.ts'
-import { neoGroupMail } from '../src/platforms/neoGroup.ts'
-import { inMuenchenTitle } from '../src/platforms/inMuenchen.ts'
+import { submissionMail } from '../src/platforms/email.ts'
 import { keepItRollinPromoHtml } from '../src/platforms/keepItRollin.ts'
 import { berlinToUtc, utcIsoSeconds } from '../src/time.ts'
 import type { Event } from '../src/platforms/types.ts'
@@ -83,22 +82,43 @@ test('eventbrite payload', () => {
   assert.equal(toTicketClass(event, 200).ticket_class.cost, 'EUR,1500')
   assert.equal(toTicketClass({ ...event, price: '12,50' }, 200).ticket_class.cost, 'EUR,1250')
   assert.equal(toTicketClass({ ...event, price: 'FREE' }, 200).ticket_class.free, true)
+  // Not a sales channel: every order would have to be 99 tickets.
+  const tc = toTicketClass(event, 50).ticket_class
+  assert.deepEqual([tc.minimum_quantity, tc.maximum_quantity, tc.quantity_total], [99, 99, 99])
 })
 
-test('neo group mail', () => {
-  const m = neoGroupMail(event)
+test('submission mail (Neo Group, visitBerlin)', () => {
+  const m = submissionMail(event, 'visitBerlin')
   assert.equal(m.subject, 'Veranstaltung: Bass & Bässe – 20.11.2026')
+  assert.match(m.text, /^Hallo visitBerlin Team,/)
   assert.match(m.text, /Datum: 20\.11\.2026, 23:00 – 21\.11\.2026, 06:00 Uhr/)
   assert.match(m.text, /Eintritt: 15 €/)
 })
 
-test('in-münchen title rules', () => {
-  assert.equal(inMuenchenTitle('BASS AM BRUNNEN'), 'Bass Am Brunnen')
-  assert.equal(inMuenchenTitle('Bass am Brunnen'), 'Bass am Brunnen')
-  assert.equal(inMuenchenTitle('x'.repeat(80)).length, 60)
-})
 
 test('keepitrollin promo text adds location only when the dropdown had no match', () => {
   assert.match(keepItRollinPromoHtml(event, false), /Location:<\/strong> VOID Club \+ Hall, Musterstr\. 1, 10245 Berlin/)
   assert.doesNotMatch(keepItRollinPromoHtml(event, true), /Location:/)
+})
+
+test('ströer: overnight club night is a one-day event', async () => {
+  const { stroeerDates } = await import('../src/platforms/stroeer.ts')
+  assert.deepEqual(stroeerDates(event), { start: '2026-11-20', end: '2026-11-20' })
+  assert.deepEqual(stroeerDates({ ...event, end: '2026-11-22T18:00' }), { start: '2026-11-20', end: '2026-11-22' })
+  assert.deepEqual(stroeerDates({ ...event, end: '2026-11-21T14:00' }), { start: '2026-11-20', end: '2026-11-21' })
+})
+
+test('ströer: request body and length limits', async () => {
+  const { toStroeerRequest } = await import('../src/platforms/stroeer.ts')
+  assert.throws(() => toStroeerRequest({ ...event, title: 'Berlin Bass Music Vibes' }, 't'), /16 characters/)
+  const body = toStroeerRequest({ ...event, shortTitle: 'Bass & Bässe' }, 'temp-1')
+  assert.deepEqual(body.requestFieldValues, {
+    summary: 'Bass & Bässe',
+    customfield_32127: 'VOID Club + Hall',
+    customfield_32108: '2026-11-20',
+    customfield_32109: '2026-11-20',
+    attachment: ['temp-1'],
+    customfield_32002: [{ id: '31700' }],
+  })
+  assert.throws(() => toStroeerRequest({ ...event, venue: 'A Very Long Venue Name Indeed' }, 't'), /20 characters/)
 })
