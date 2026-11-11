@@ -1,0 +1,28 @@
+{
+  "name": "fraktvred-promo-tool",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "start": "tsx --env-file-if-exists=.env src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@hono/node-server": "^2.1.6",
+    "@sanity/client": "^8.15.1",
+    "hono": "^4.13.17",
+    "nodemailer": "^10.5.0",
+    "playwright": "1.65.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
