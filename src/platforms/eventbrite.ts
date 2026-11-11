@@ -68,6 +68,11 @@ export function toTicketClass(
   }
 }
 
+/** Pure: request body for POST /organizations/{org}/venues/. */
+export function toEventbriteVenue(e: Event) {
+  return { venue: { name: e.venue, address: { address_1: e.address, city: e.city, postal_code: e.postalCode, country: 'DE' } } }
+}
+
 async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     method: init.method ?? (init.body ? 'POST' : 'GET'),
@@ -99,16 +104,19 @@ export const eventbrite: Platform = {
   id: 'eventbrite',
   name: 'Eventbrite',
   envVars: ['EVENTBRITE_TOKEN', 'EVENTBRITE_ORG_ID'],
+  preview(e) {
+    return [
+      { label: 'On publish', text: 'Venue, logo, event and ticket are created, then the event is published.' },
+      { label: 'Description', html: descriptionHtml(e) },
+      ...(e.imagePath ? [{ label: 'Logo', image: e.imagePath }] : []),
+      { label: 'Event', json: toEventbriteEvent(e, { venueId: '<created on publish>', logoId: e.imagePath ? '<uploaded flyer>' : undefined }) },
+      { label: 'Ticket', json: toTicketClass(e, Number(process.env.EVENTBRITE_CAPACITY ?? 200)) },
+      { label: 'Venue', json: toEventbriteVenue(e) },
+    ]
+  },
   async publish(e) {
     const org = process.env.EVENTBRITE_ORG_ID
-    const venue = await api<{ id: string }>(`/organizations/${org}/venues/`, {
-      body: {
-        venue: {
-          name: e.venue,
-          address: { address_1: e.address, city: e.city, postal_code: e.postalCode, country: 'DE' },
-        },
-      },
-    })
+    const venue = await api<{ id: string }>(`/organizations/${org}/venues/`, { body: toEventbriteVenue(e) })
     const logoId = e.imagePath ? await uploadLogo(e.imagePath) : undefined
     const created = await api<{ id: string; url: string }>(`/organizations/${org}/events/`, {
       body: toEventbriteEvent(e, { venueId: venue.id, logoId }),

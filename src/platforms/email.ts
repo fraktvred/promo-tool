@@ -37,6 +37,15 @@ function emailPlatform(spec: { id: string; name: string; to: string; prefix: str
     id: spec.id,
     name: `${spec.name} (email)`,
     envVars: ['SMTP_URL', 'SMTP_FROM'],
+    preview(e) {
+      const { subject, text } = submissionMail(e, spec.name)
+      return [
+        { label: 'To', text: process.env[`${spec.prefix}_TO`] || spec.to },
+        { label: 'Subject', text: subject },
+        { label: 'Body', text },
+        ...(e.imagePath ? [{ label: 'Attachment', image: e.imagePath }] : [{ label: 'Attachment', text: '(no flyer)' }]),
+      ]
+    },
     async publish(e) {
       const to = process.env[`${spec.prefix}_TO`] || spec.to
       const transport = nodemailer.createTransport(process.env.SMTP_URL)

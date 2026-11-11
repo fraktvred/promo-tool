@@ -114,6 +114,22 @@ export const fraktvred: Platform = {
   id: 'fraktvred',
   name: 'fraktvred.com (Sanity draft)',
   envVars: ['SANITY_PROJECT_ID', 'SANITY_DATASET', 'SANITY_TOKEN'],
+  preview(e) {
+    let n = 0
+    const doc = toSanityEvent(e, {
+      slug: slugify(e.title),
+      posterAssetId: e.imagePath ? '<uploaded flyer>' : undefined,
+      makeKey: () => `k${n++}`,
+    })
+    return [
+      {
+        label: 'On publish',
+        text: 'Created as a DRAFT. Venue and lineup names are linked to existing venue / artist documents when the names match; if the slug is taken, the date is appended.',
+      },
+      ...(e.imagePath ? [{ label: 'Poster', image: e.imagePath }] : []),
+      { label: 'Document', json: doc },
+    ]
+  },
   async publish(e) {
     const client = createClient({
       projectId: process.env.SANITY_PROJECT_ID!,

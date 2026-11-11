@@ -11,6 +11,9 @@ const FORM_URL = 'https://keepitrollin.de/form-builder/form_event_add/'
 // editor's HTML into the hidden `promo_richtext` input. It requires at least 50 characters.
 const PROMO_EDITOR = '#Inputfield_promo_richtext_ckeditor'
 
+const MISSING_FLYER = 'KeepItRollin requires a flyer image.'
+const genres = () => (process.env.KEEPITROLLIN_GENRES ?? 'Drum&Bass').split(',').map((g: string) => g.trim()).filter(Boolean)
+
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 export function keepItRollinPromoHtml(e: Event, venueMatched: boolean): string {
@@ -38,8 +41,25 @@ export const keepItRollin = browserPlatform({
   id: 'keepitrollin',
   name: 'KeepItRollin',
   envVars: ['CONTACT_EMAIL'],
+  preview(e) {
+    if (!e.imagePath) throw new Error(MISSING_FLYER)
+    const s = localParts(e.start)
+    return [
+      { label: 'Title', text: e.title },
+      {
+        label: 'Location',
+        text: `"${e.venue}" is picked from KeepItRollin's venue list if it is there. Otherwise the field stays empty and the address goes into the promo text (shown below).`,
+      },
+      { label: 'Doors open', text: `${s.dmy} ${s.time}` },
+      { label: 'Flyer', image: e.imagePath },
+      { label: 'Genres', text: genres().join(', ') },
+      { label: 'Promo text', html: keepItRollinPromoHtml(e, false) },
+      { label: 'Event link', text: e.ticketUrl ?? '(none)' },
+      { label: 'Mail contact', text: process.env.CONTACT_EMAIL || '(CONTACT_EMAIL not set)' },
+    ]
+  },
   async fill(page, e) {
-    if (!e.imagePath) throw new Error('KeepItRollin requires a flyer image.')
+    if (!e.imagePath) throw new Error(MISSING_FLYER)
     await page.goto(FORM_URL)
 
     await page.locator('#Inputfield_title').fill(e.title)
@@ -51,8 +71,7 @@ export const keepItRollin = browserPlatform({
 
     await page.locator('#Inputfield_flyer').setInputFiles(e.imagePath)
 
-    const genres = (process.env.KEEPITROLLIN_GENRES ?? 'Drum&Bass').split(',').map((g: string) => g.trim()).filter(Boolean)
-    for (const g of genres) await page.getByLabel(g, { exact: true }).check()
+    for (const g of genres()) await page.getByLabel(g, { exact: true }).check()
 
     const html = keepItRollinPromoHtml(e, venueMatched)
     await page.locator(PROMO_EDITOR).click()

@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { chromium, type Page } from 'playwright'
-import type { Event, Platform, PublishResult } from './platforms/types.ts'
+import type { Event, Platform, PreviewItem, PublishResult } from './platforms/types.ts'
 
 // Shared Playwright plumbing for platforms without an API. Always headless: this runs on a server.
 //
@@ -13,6 +13,8 @@ export type BrowserSpec = {
   id: string
   name: string
   envVars: string[]
+  /** What `fill` would enter, without opening a browser. */
+  preview: (e: Event) => PreviewItem[]
   /** Navigate to the form and fill it. Must not click the final submit. */
   fill: (page: Page, e: Event) => Promise<void>
   /** Click the final submit and wait for confirmation; returns what to show in the UI. */
@@ -25,6 +27,7 @@ export function browserPlatform(spec: BrowserSpec): Platform & { spec: BrowserSp
     id: spec.id,
     name: spec.name,
     envVars: spec.envVars,
+    preview: spec.preview,
     async publish(e) {
       const browser = await chromium.launch()
       const page = await browser.newPage({ locale: 'de-DE', timezoneId: 'Europe/Berlin' })

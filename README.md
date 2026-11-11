@@ -10,6 +10,10 @@ npm start              # http://localhost:3000
 npm test               # payload-mapping unit tests
 ```
 
+**Preview** shows, for every platform (configured or not), exactly what would be sent: emails,
+descriptions, field values, request bodies and images. It sends nothing, and it shows validation
+errors such as Ströer's 16-character title limit. Uploaded images are kept between preview and publish.
+
 ## Platforms
 
 | Platform | How | Status |

@@ -122,3 +122,15 @@ test('ströer: request body and length limits', async () => {
   })
   assert.throws(() => toStroeerRequest({ ...event, venue: 'A Very Long Venue Name Indeed' }, 't'), /20 characters/)
 })
+
+test('every platform previews without touching the network', async () => {
+  const { platforms } = await import('../src/platforms/index.ts')
+  const e = { ...event, shortTitle: 'Bass & Bässe', imagePath: '/x/flyer.png', motifImagePath: '/x/motif.png' }
+  for (const p of platforms) {
+    const items = p.preview(e)
+    assert.ok(items.length > 0, p.id)
+  }
+  const stroeer = platforms.find((p) => p.id === 'stroeer')!
+  assert.throws(() => stroeer.preview({ ...e, shortTitle: undefined, title: 'Berlin Bass Music Vibes' }), /16 characters/)
+  assert.throws(() => stroeer.preview({ ...e, motifImagePath: undefined }), /text-free image/)
+})

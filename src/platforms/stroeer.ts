@@ -17,6 +17,7 @@ const REQUEST_TYPE_ID = process.env.STROEER_REQUESTTYPE_ID ?? '273' // "Veransta
 
 export const STROEER_TITLE_MAX = 16
 export const STROEER_VENUE_MAX = 20
+const MISSING_MOTIF = 'Ströer needs a text-free image (no title, date, venue or logos): upload one in "Text-free image".'
 const CONFIRMATION_YES = '31700' // "Bestätigung": organizer indemnifies Ströer against third-party claims
 
 /**
@@ -75,10 +76,20 @@ export const stroeer: Platform = {
   id: 'stroeer',
   name: 'Ströer Kulturkalender Berlin',
   envVars: ['STROEER_USER', 'STROEER_PASSWORD'],
+  preview(e) {
+    if (!e.motifImagePath) throw new Error(MISSING_MOTIF)
+    const f = toStroeerRequest(e, '<uploaded text-free image>').requestFieldValues
+    return [
+      { label: 'Name der Veranstaltung', text: f.summary },
+      { label: 'Ort der Veranstaltung', text: f.customfield_32127 },
+      { label: 'Veranstaltungsstart / -ende', text: `${f.customfield_32108} – ${f.customfield_32109}` },
+      { label: 'Motiv', image: e.motifImagePath },
+      ...(f.customfield_33204 ? [{ label: 'Copyright', text: f.customfield_33204 }] : []),
+      { label: 'Bestätigung', text: 'Ja — organizer indemnifies Ströer against third-party claims' },
+    ]
+  },
   async publish(e) {
-    if (!e.motifImagePath) {
-      throw new Error('Ströer needs a text-free image (no title, date, venue or logos): upload one in "Text-free image".')
-    }
+    if (!e.motifImagePath) throw new Error(MISSING_MOTIF)
     // Validate before uploading anything.
     toStroeerRequest(e, 'pending')
 

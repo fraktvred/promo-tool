@@ -28,10 +28,18 @@ export type Event = {
 
 export type PublishResult = { url?: string; note?: string }
 
+/** One block of a platform's preview. `image` is a local file path (an uploaded image). */
+export type PreviewItem = { label: string } & ({ text: string } | { html: string } | { json: unknown } | { image: string })
+
 export interface Platform {
   id: string
   name: string
   /** All of these must be set for the platform to be offered in the UI. */
   envVars: string[]
+  /**
+   * What `publish` would send, without sending anything or touching the network. Built from the
+   * same mapping functions as `publish`; throws the same validation errors.
+   */
+  preview(e: Event): PreviewItem[]
   publish(e: Event): Promise<PublishResult>
 }
